@@ -237,7 +237,6 @@ export default class Vault extends VaultBase {
             const tokenInfo = await this.engine.getOrAddToken(
               this.networkId,
               nativeTx.receiverId,
-              false,
             );
             if (tokenInfo) {
               const transferData = parseJsonFromRawResponse(
@@ -359,7 +358,6 @@ export default class Vault extends VaultBase {
       const token = await this.engine.getOrAddToken(
         this.networkId,
         transferInfo.token ?? '',
-        true,
       );
       if (token) {
         const hasStorageBalance = await this.isStorageBalanceAvailable({

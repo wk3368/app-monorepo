@@ -7,6 +7,7 @@ import {
 } from '@onekeyfe/blockchain-libs/dist/secret';
 import { encrypt } from '@onekeyfe/blockchain-libs/dist/secret/encryptors/aes256';
 import { IJsonRpcRequest } from '@onekeyfe/cross-inpage-provider-types';
+import { Mutex, MutexInterface } from 'async-mutex';
 import BigNumber from 'bignumber.js';
 import * as bip39 from 'bip39';
 import { baseDecode } from 'borsh';
@@ -130,6 +131,8 @@ class Engine {
   public vaultFactory = new VaultFactory({
     engine: this,
   });
+
+  private getTokenLocks: Record<string, MutexInterface> = {};
 
   constructor() {
     this.dbApi = new DbApi() as DBAPI;
@@ -906,7 +909,6 @@ class Engine {
   public async getOrAddToken(
     networkId: string,
     tokenIdOnNetwork: string,
-    requireAlreadyAdded = false, // TODO remove
   ): Promise<Token | undefined> {
     let noThisToken: undefined;
 
@@ -921,30 +923,46 @@ class Engine {
       return token;
     }
 
-    if (requireAlreadyAdded) {
-      // DO Not throw error here, may cause workflow crash.
-      //    if you need check token exists, please use `isTokenExistsInDb()`
-      // throw new OneKeyInternalError(`token ${tokenIdOnNetwork} not found.`);
-    }
+    this.getTokenLocks = { [tokenId]: new Mutex(), ...this.getTokenLocks };
 
-    const vault = await this.getChainOnlyVault(networkId);
-    const toAdd = getPresetToken(networkId, tokenIdOnNetwork);
-    const [tokenInfo] = await vault.fetchTokenInfos([tokenIdOnNetwork]);
-    if (typeof tokenInfo === 'undefined') {
-      console.error('fetch tokenInfo ERROR: ', networkId, tokenIdOnNetwork);
-      return noThisToken;
-    }
-    const overwrite: Partial<Token> = {
-      id: tokenId,
-      decimals: tokenInfo.decimals,
-    };
-    if (toAdd.decimals === -1 || getImplFromNetworkId(networkId) !== IMPL_SOL) {
-      // If the token is not preset or it is not on solana, use the name and
-      // symbol retrieved from the network.
-      overwrite.name = tokenInfo.name;
-      overwrite.symbol = tokenInfo.symbol;
-    }
-    return this.dbApi.addToken({ ...toAdd, ...overwrite });
+    const ret = await this.getTokenLocks[tokenId].runExclusive(async () => {
+      // Try again for concurrent scenarios.
+      const secondTryToken = await this.dbApi.getToken(tokenId);
+      if (typeof secondTryToken !== 'undefined') {
+        return secondTryToken;
+      }
+
+      const vault = await this.getChainOnlyVault(networkId);
+      const toAdd = getPresetToken(networkId, tokenIdOnNetwork);
+      let tokenInfo;
+      try {
+        [tokenInfo] = await vault.fetchTokenInfos([tokenIdOnNetwork]);
+      } catch (e) {
+        console.error(e);
+      }
+      if (typeof tokenInfo === 'undefined') {
+        console.error('fetch tokenInfo ERROR: ', networkId, tokenIdOnNetwork);
+        return noThisToken;
+      }
+      const overwrite: Partial<Token> = {
+        id: tokenId,
+        decimals: tokenInfo.decimals,
+      };
+      if (
+        toAdd.decimals === -1 ||
+        getImplFromNetworkId(networkId) !== IMPL_SOL
+      ) {
+        // If the token is not preset or it is not on solana, use the name and
+        // symbol retrieved from the network.
+        overwrite.name = tokenInfo.name;
+        overwrite.symbol = tokenInfo.symbol;
+      }
+      return this.dbApi.addToken({ ...toAdd, ...overwrite });
+    });
+
+    // Clear mutex lock to avoid eating too much memory.
+    delete this.getTokenLocks[tokenId];
+    return ret;
   }
 
   private async addDefaultToken(

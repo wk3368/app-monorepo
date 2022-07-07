@@ -716,13 +716,36 @@ export async function parseCovalentTxToDecodedTx(
     covalentTx.log_events.length
   ) {
     let outputActions = await Promise.all(
-      covalentTx.log_events.map((event) =>
-        createOutputActionFromCovalentLogEvent({
-          event,
-          vault,
-          address,
-        }),
-      ),
+      covalentTx.log_events
+        .filter((event) => {
+          if (event.decoded) {
+            const { name, params } = event.decoded;
+            if (name === 'Transfer') {
+              const from = (
+                params.find((p) => p.name === 'from')?.value || ''
+              ).toLowerCase();
+              const to = (
+                params.find((p) => p.name === 'to')?.value || ''
+              ).toLowerCase();
+              return from === address || to === address;
+            }
+            if (name === 'Approval') {
+              const owner = (
+                params.find((p) => p.name === 'owner')?.value || ''
+              ).toLowerCase();
+              return owner === address;
+            }
+          }
+          return false;
+        })
+        .slice(0, 10)
+        .map((event) =>
+          createOutputActionFromCovalentLogEvent({
+            event,
+            vault,
+            address,
+          }),
+        ),
     );
 
     debugCodes.breakpointCovalentTx({ txHash: covalentTx.tx_hash });

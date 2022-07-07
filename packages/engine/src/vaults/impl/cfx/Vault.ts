@@ -116,7 +116,6 @@ export default class Vault extends VaultBase {
     const token = await this.engine.getOrAddToken(
       networkId,
       tokenIdOnNetwork ?? '',
-      true,
     );
     const valueBN = new BigNumber(value);
     const extraCombined = {

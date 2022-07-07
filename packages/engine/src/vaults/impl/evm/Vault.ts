@@ -169,7 +169,6 @@ export default class Vault extends VaultBase {
     const token = await this.engine.getOrAddToken(
       networkId,
       tokenIdOnNetwork ?? '',
-      true,
     );
     const valueBN = new BigNumber(value);
     const extraCombined = {
@@ -370,7 +369,6 @@ export default class Vault extends VaultBase {
       const token = await this.engine.getOrAddToken(
         this.networkId,
         transferInfo.token ?? '',
-        true,
       );
       if (!token) {
         throw new Error(`Token not found: ${transferInfo.token as string}`);
