@@ -8,7 +8,7 @@ import { shortenAddress } from '@onekeyhq/components/src/utils';
 
 import { SendRoutes, SendRoutesParams } from '../../Send/types';
 import { useSendConfirmRouteParamsParsed } from '../../Send/useSendConfirmRouteParamsParsed';
-import { TxDetailActionBoxAutoTransform } from '../components/TxDetailActionBox';
+import { TxDetailActionBoxAutoTransform } from '../components/TxDetailActionBoxAutoTransform';
 import { TxListActionBox } from '../components/TxListActionBox';
 import { TxStatusBarInList } from '../components/TxStatusBar';
 import { TxActionElementAddressNormal } from '../elements/TxActionElementAddress';

@@ -1,13 +1,10 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 
-import {
-  IInjectedProviderNames,
-  IInjectedProviderNamesStrings,
-} from '@onekeyfe/cross-inpage-provider-types';
+import { IInjectedProviderNames } from '@onekeyfe/cross-inpage-provider-types';
 import BigNumber from 'bignumber.js';
 import { useIntl } from 'react-intl';
 
-import { Modal } from '@onekeyhq/components';
+import { Modal, Text } from '@onekeyhq/components';
 import { ModalProps } from '@onekeyhq/components/src/Modal';
 import useModalClose from '@onekeyhq/components/src/Modal/Container/useModalClose';
 import {
@@ -16,6 +13,7 @@ import {
   IEncodedTx,
   IFeeInfoPayload,
 } from '@onekeyhq/engine/src/vaults/types';
+import platformEnv from '@onekeyhq/shared/src/platformEnv';
 
 import { IDappSourceInfo } from '../../../background/IBackgroundApi';
 import { useActiveWalletAccount, useManageTokens } from '../../../hooks';
@@ -77,15 +75,22 @@ function SendConfirmModal(props: ITxConfirmViewProps) {
   });
   const modalClose = useModalClose();
 
+  const nativeBalance = useMemo(
+    () =>
+      getTokenBalance({
+        token: nativeToken,
+        defaultValue: '0',
+      }),
+    [getTokenBalance, nativeToken],
+  );
+
   // TODO move to validator
+  const fee = feeInfoPayload?.current?.totalNative ?? '0';
+
   const balanceInsufficient = useMemo(() => {
-    const fee = feeInfoPayload?.current?.totalNative ?? '0';
-    const nativeBalance = getTokenBalance({
-      token: nativeToken,
-      defaultValue: '0',
-    });
+    console.log('SendConfirmModal nativeBalance >>>> ', nativeBalance);
     return new BigNumber(nativeBalance).lt(new BigNumber(fee));
-  }, [feeInfoPayload, getTokenBalance, nativeToken]);
+  }, [fee, nativeBalance]);
 
   const isWatchingAccount = useMemo(
     () => !!(accountId && accountId.startsWith('watching-')),
@@ -156,6 +161,12 @@ function SendConfirmModal(props: ITxConfirmViewProps) {
             {children}
 
             <DecodeTxButtonTest encodedTx={encodedTx} />
+
+            {platformEnv.isDev ? (
+              <Text>
+                {nativeBalance} {nativeToken?.symbol}
+              </Text>
+            ) : null}
           </>
         ),
       }}
